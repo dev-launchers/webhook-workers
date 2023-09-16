@@ -1,0 +1,42 @@
+name: Figma Discord Webhook
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'figma-discord/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract branch name
+        run: echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+      - name: Use branch name
+        run: echo "Branch $BRANCH_NAME"
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: |
+          cd figma-discord && pwd
+          npm ci
+      - name: Deploy app
+        uses: cloudflare/wrangler-action@v3
+        with:
+          workingDirectory: "figma-discord"
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          command: deploy --env $BRANCH_NAME
+          postCommands: |
+            echo "*** secrets ***" && pwd
+            echo "${{ secrets.WEBHOOK_PASSWORD }}" | npx wrangler secret put WEBHOOK_PASSWORD --env $BRANCH_NAME
+            echo "${{ secrets.DISCORD_WEBHOOK_URL }}" | npx wrangler secret put DISCORD_WEBHOOK_URL --env $BRANCH_NAME
+            echo "******"
+        env:
+          WEBHOOK_PASSWORD: ${{ secrets.WEBHOOK_PASSWORD }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
